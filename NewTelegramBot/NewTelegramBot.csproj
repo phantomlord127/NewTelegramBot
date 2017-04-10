@@ -98,6 +98,7 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Helpers\Enum.cs" />
     <Compile Include="Helpers\Json\JsonRcpRequest.cs" />
     <Compile Include="Helpers\Json\JsonResponse.cs" />
     <Compile Include="Helpers\KeyBoard.cs" />

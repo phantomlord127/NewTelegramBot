@@ -22,21 +22,24 @@ namespace NewTelegramBot.Helpers
         private MessageWebSocket _webSock = new MessageWebSocket();
         private DataWriter _messageWriter;
         private Uri _serverUri;
-        private Dictionary<string, long> _downloads = new Dictionary<string, long>();
-        private Dictionary<long, string> _downloadQue = new Dictionary<long, string>();
+        private Dictionary<string, int> _downloads = new Dictionary<string, int>();
+        private Dictionary<int, string> _downloadQue = new Dictionary<int, string>();
         private bool _isConnected = false;
         private CancellationToken _ct;
         private object _monitor = new object();
         private string _Aria2Token;
+        private StartupTask _telegramBot;
 
-        public RPCAria2Helper(CancellationToken ct, ResourceLoader config)
+        public RPCAria2Helper(CancellationToken ct, StartupTask telegramBot)
         {
             _ct = ct;
-            _serverUri = new Uri(config.GetString("Aria2URL"));
-            _Aria2Token = config.GetString("Aria2Secret");
+            _telegramBot = telegramBot;
+            _serverUri = new Uri(telegramBot.Config.GetString("Aria2URL"));
+            _Aria2Token = telegramBot.Config.GetString("Aria2Secret");
+
         }
 
-        public async Task DownloadURI(string downloadUri, long messageId)
+        public async Task DownloadURI(string downloadUri, int messageId)
         {
             bool isConnected = await ConnectedToWebSocket();
             if (isConnected)
@@ -73,7 +76,6 @@ namespace NewTelegramBot.Helpers
             else
             {
                 _downloadQue.Add(messageId, downloadUri);
-                //Nachricht schicken
             }
         }
 
@@ -94,9 +96,9 @@ namespace NewTelegramBot.Helpers
                     if (response.Error == null)
                     {
                         string gid = response.Parameters.Gid.ToString();
-                        long messageID = _downloads[gid];
+                        int messageID = _downloads[gid];
                         // Wenn download Start
-
+                        await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Method.ToString()}");
 
                         // Wenn Dowload Ende
                         if (response.Method.ToString() == "aria2.onDownloadComplete()")
@@ -154,7 +156,7 @@ namespace NewTelegramBot.Helpers
                 }
                 catch (Exception ex)
                 {
-                    string s = string.Empty;
+                    string s = ex.Message;
                 }
                 _webSock.Dispose();
             }

@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.AppService;
 using Windows.ApplicationModel.Background;
 using Windows.ApplicationModel.Resources;
+using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.System.Threading;
 
@@ -23,10 +25,15 @@ namespace NewTelegramBot
         private CancellationTokenSource _ctSrc;
         private CancellationToken _ct;
         private ThreadPoolTimer _CheckServerStateTimer;
-        private bool _serverAwake = false;
+        private bool _serverAwake;
         private long _ChatID;
-        private ResourceLoader _conf = ResourceLoader.GetForCurrentView("Config");
+        private ResourceLoader _conf;
         private Helpers.RPCAria2Helper _aria2;
+        private TelegramBotState _state;
+        public ResourceLoader Config
+        {
+            get { return _conf; }
+        }
 
         public async void Run(IBackgroundTaskInstance taskInstance)
         {
@@ -53,47 +60,47 @@ namespace NewTelegramBot
 
                         if (message.Chat.Id == _ChatID)
                         {
-                            
                             await _telebot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, _ct).ConfigureAwait(false);
-                            KeyboardButton t1;
-                            KeyboardButton t2;
-                            KeyboardButton[] row;
                             if (update.Type == UpdateType.MessageUpdate)
                             {
                                 string msg = string.Empty;
                                 if (message.Text.Equals("\U0001f5a5 Server starten"))
                                 {
-                                    //_serverAwake = await NetworkHelper.IsServerAwake();
+                                    _serverAwake = await NetworkHelper.IsServerAwake();
                                     msg = "Der Server ist bereits an.";
                                     if (!_serverAwake)
                                     {
-                                        //await NetworkHelper.WakeTheServer();
+                                        await NetworkHelper.WakeTheServer();
                                         msg = "Der Server wird gestartet";
                                     }
                                 }
                                 else if (message.Text.Equals("\U0001f517 Download Modus"))
                                 {
-                                    //Verweis auf andere Klasse mit DownloadLink
-                                    
-                                    Task t = _aria2.DownloadURI("https://github.com/aria2/aria2/releases/download/release-1.31.0/aria2-1.31.0-win-64bit-build1.zip", message.MessageId);
-                                    msg = "Download-Test";
+                                    msg = "Download Modus aktiv";
+                                    _state = TelegramBotState.DownloadMode;
+                                }
+                                else if (message.Text.Equals("\U0001f519 Download Modus beenden"))
+                                {
+                                    msg = "Download Modus beendet";
+                                    _state = TelegramBotState.MainMenu;
                                 }
                                 else
                                 {
-                                    msg = "Soll der Server gestartet werden?";
+                                    if (_state == TelegramBotState.DownloadMode)
+                                    {
+                                        await _aria2.DownloadURI(message.Text, message.MessageId);
+                                        msg = "Download eingereiht";
+                                    }
+                                    else
+                                    {
+                                        msg = "Kommando nicht verstanden.";
+                                    }
                                 }
-                                t1 = new KeyboardButton("\U0001f5a5 Server starten");
-                                t2 = new KeyboardButton("\U0001f517 Download Modus");
-                                row = new KeyboardButton[] { t1, t2 };
-                                Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup test = new Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup(row, true);
-                                await _telebot.SendTextMessageAsync(message.Chat.Id, msg, false, false, 0, test, ParseMode.Default, _ct);
+                                await SendMessageAsync(msg);
                             }
                             else if (update.Type == UpdateType.CallbackQueryUpdate)
                             {
-                                t1 = new KeyboardButton("Hallo neues Keyboard");
-                                row = new KeyboardButton[] { t1 };
-                                Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup test = new Telegram.Bot.Types.ReplyMarkups.ReplyKeyboardMarkup(row, true);
-                                await _telebot.SendTextMessageAsync(message.Chat.Id, update.CallbackQuery.Data, false, false, 0, test, ParseMode.Default, _ct);
+                                await SendMessageAsync("Callback Stuff", message.MessageId);
                             }
                         }
                     }
@@ -104,23 +111,47 @@ namespace NewTelegramBot
             _deferral.Complete();
         }
 
+        public IAsyncAction SendMessageAsync(string message)
+        {
+            return SendMessageAsync(message, 0);
+        }
+
+        public IAsyncAction SendMessageAsync(string message, int replyToMessageId)
+        {
+            return _telebot.SendTextMessageAsync(_ChatID, message, replyToMessageId: replyToMessageId, replyMarkup: Helpers.KeyBoard.GetKeyboardByTelegramBotState(_state),
+                cancellationToken: _ct).AsAsyncAction();
+        }
+
         private void Initialize(BackgroundTaskDeferral deferral)
         {
             _deferral = deferral;
             _ctSrc = new CancellationTokenSource();
             _ct = _ctSrc.Token;
+            _conf = ResourceLoader.GetForCurrentView("Config");
             _CheckServerStateTimer = ThreadPoolTimer.CreatePeriodicTimer(CheckServerStateTimerElapsedHandler, new TimeSpan(0, 5, 0));
             _telebot = new TelegramBotClient(_conf.GetString("TelegramToken"));
             _ChatID = Convert.ToInt64(_conf.GetString("TelegramChatID"));
-            _aria2 = new Helpers.RPCAria2Helper(_ct, _conf);
+            _aria2 = new Helpers.RPCAria2Helper(_ct, this);
+            _serverAwake = false;
+            _state = TelegramBotState.None;
         }
 
         private async void CheckServerStateTimerElapsedHandler(ThreadPoolTimer timer)
         {
-            bool ttt = await NetworkHelper.IsServerAwake();
-            if (ttt != _serverAwake)
+            bool serverAwake = await NetworkHelper.IsServerAwake();
+            if (serverAwake != _serverAwake)
             {
-                string s = string.Empty;
+                _serverAwake = serverAwake;
+                string message = string.Empty;
+                if (serverAwake)
+                {
+                    message = "Der Server ist nun eingeschaltet!";
+                }
+                else
+                {
+                    message = "Der Server ist nun ausgeschlatet!";
+                }
+                await SendMessageAsync(message);
             }
         }
 
