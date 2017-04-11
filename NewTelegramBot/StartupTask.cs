@@ -64,27 +64,30 @@ namespace NewTelegramBot
                             if (update.Type == UpdateType.MessageUpdate)
                             {
                                 string msg = string.Empty;
-                                if (message.Text.Equals("\U0001f5a5 Server starten"))
+                                if (! string.IsNullOrEmpty(message.Text))
                                 {
-                                    _serverAwake = await NetworkHelper.IsServerAwake();
-                                    msg = "Der Server ist bereits an.";
-                                    if (!_serverAwake)
+                                    if (message.Text.Equals("\U0001f5a5 Server starten"))
                                     {
-                                        await NetworkHelper.WakeTheServer();
-                                        msg = "Der Server wird gestartet";
+                                        _serverAwake = await NetworkHelper.IsServerAwake();
+                                        msg = "Der Server ist bereits an.";
+                                        if (!_serverAwake)
+                                        {
+                                            await NetworkHelper.WakeTheServer();
+                                            msg = "Der Server wird gestartet";
+                                        }
+                                    }
+                                    else if (message.Text.Equals("\U0001f517 Download Modus"))
+                                    {
+                                        msg = "Download Modus aktiv";
+                                        _state = TelegramBotState.DownloadMode;
+                                    }
+                                    else if (message.Text.Equals("\U0001f519 Download Modus beenden"))
+                                    {
+                                        msg = "Download Modus beendet";
+                                        _state = TelegramBotState.MainMenu;
                                     }
                                 }
-                                else if (message.Text.Equals("\U0001f517 Download Modus"))
-                                {
-                                    msg = "Download Modus aktiv";
-                                    _state = TelegramBotState.DownloadMode;
-                                }
-                                else if (message.Text.Equals("\U0001f519 Download Modus beenden"))
-                                {
-                                    msg = "Download Modus beendet";
-                                    _state = TelegramBotState.MainMenu;
-                                }
-                                else
+                                if (string.IsNullOrEmpty(msg))
                                 {
                                     if (_state == TelegramBotState.DownloadMode)
                                     {
@@ -127,7 +130,7 @@ namespace NewTelegramBot
             _deferral = deferral;
             _ctSrc = new CancellationTokenSource();
             _ct = _ctSrc.Token;
-            _conf = ResourceLoader.GetForCurrentView("Config");
+            _conf = ResourceLoader.GetForViewIndependentUse("Config");
             _CheckServerStateTimer = ThreadPoolTimer.CreatePeriodicTimer(CheckServerStateTimerElapsedHandler, new TimeSpan(0, 5, 0));
             _telebot = new TelegramBotClient(_conf.GetString("TelegramToken"));
             _ChatID = Convert.ToInt64(_conf.GetString("TelegramChatID"));

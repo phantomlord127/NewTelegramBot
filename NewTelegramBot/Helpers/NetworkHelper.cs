@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
@@ -18,7 +19,7 @@ namespace NewTelegramBot
 
         private static async Task<bool> IsServerTheAwake()
         {
-            ResourceLoader config = ResourceLoader.GetForCurrentView("Config");
+            ResourceLoader config = ResourceLoader.GetForViewIndependentUse("Config");
             bool isAwake = false;
             StreamSocket socket = new StreamSocket();
             Windows.Networking.HostName serverHost = new Windows.Networking.HostName(config.GetString("NetworkHelper_HostName"));
@@ -51,12 +52,7 @@ namespace NewTelegramBot
 
         private static async Task WakeOnLan()
         {
-            byte[] mac = new byte[6];
-            string[] address = ResourceLoader.GetForCurrentView("Config").GetString("NetworkHelper_HostMacAddress").Split(':');
-            for (int i = 0; i < 6; i++)
-            {
-                mac[i] = Convert.ToByte(address[i]);
-            }
+            byte[] mac = ResourceLoader.GetForViewIndependentUse("Config").GetString("NetworkHelper_HostMacAddress").Split(':').Select(x => Convert.ToByte(x, 16)).ToArray();
 
             // WOL packet contains a 6-bytes trailer and 16 times a 6-bytes sequence containing the MAC address.
 

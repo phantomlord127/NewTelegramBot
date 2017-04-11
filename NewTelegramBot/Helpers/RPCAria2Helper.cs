@@ -50,7 +50,7 @@ namespace NewTelegramBot.Helpers
                 JArray parameters = new JArray();
                 string guid = Guid.NewGuid().ToString("n").Substring(0, 16);
                 jsonObject["jsonrpc"] = "2.0";
-                //jsonObject["id"] = "a";
+                jsonObject["id"] = "a";
                 jsonObject["method"] = "aria2.addUri";
                 jsonObject["params"] = parameters;
                 parameters.Add(_Aria2Token);
