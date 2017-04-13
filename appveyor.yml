@@ -16,7 +16,7 @@ assembly_info:
 before_build:
 - cmd: pushd . && cd src && nuget restore && popd
 build:
-  project: src\CodeCutterUK.AppVeyor.Example.sln
+  project: C:\projects\newtelegrambot\NewTelegramBot.sln
   parallel: true
   verbosity: minimal
 deploy: off
