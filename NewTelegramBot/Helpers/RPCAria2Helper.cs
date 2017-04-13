@@ -44,26 +44,18 @@ namespace NewTelegramBot.Helpers
             bool isConnected = await ConnectedToWebSocket();
             if (isConnected)
             {
-                JObject jsonObject = new JObject();
-                JObject opt = new JObject();
-                JArray uris = new JArray();
-                JArray parameters = new JArray();
-                string guid = Guid.NewGuid().ToString("n").Substring(0, 16);
-                jsonObject["jsonrpc"] = "2.0";
-                jsonObject["id"] = "a";
-                jsonObject["method"] = "aria2.addUri";
-                jsonObject["params"] = parameters;
-                parameters.Add(_Aria2Token);
-                parameters.Add(uris);
-                parameters.Add(opt);
-                uris.Add(downloadUri);
-                opt["gid"] = guid;
-                string jsonRequest = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(jsonObject));
-                _messageWriter.WriteString(jsonRequest);
-                lock (_monitor)
+                JArray request = new JArray();
+                if (_downloadQue.Count > 0)
                 {
-                    _downloads.Add(guid, messageId);
+                    foreach (KeyValuePair<int, string> entry in _downloadQue)
+                    {
+                        request.Add(CreateRequestObject(entry.Value, entry.Key));
+                    }
+                    _downloadQue.Clear();
                 }
+
+                request.Add(CreateRequestObject(downloadUri, messageId));
+                _messageWriter.WriteString(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(request)));
                 try
                 {
                     await _messageWriter.StoreAsync();
@@ -75,7 +67,10 @@ namespace NewTelegramBot.Helpers
             }
             else
             {
-                _downloadQue.Add(messageId, downloadUri);
+                lock (_monitor)
+                {
+                    _downloadQue.Add(messageId, downloadUri);
+                }
             }
         }
 
@@ -95,7 +90,7 @@ namespace NewTelegramBot.Helpers
                     JsonRessponse response = await Task.Factory.StartNew(() => JsonConvert.DeserializeObject<JsonRessponse>(read));
                     if (response.Error == null)
                     {
-                        string gid = response.Parameters.Gid.ToString();
+                        string gid = response.Parameters[0].Gid.ToString();
                         int messageID = _downloads[gid];
                         // Wenn download Start
                         await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Method.ToString()}");
@@ -167,6 +162,29 @@ namespace NewTelegramBot.Helpers
         public void Dispose()
         {
             CloseWebSocketConnection();
+        }
+
+        private JObject CreateRequestObject(string downloadUri, int messageId)
+        {
+            string gid = Guid.NewGuid().ToString("n").Substring(0, 16);
+            JObject jsonObject = new JObject();
+            JObject opt = new JObject();
+            JArray uris = new JArray();
+            JArray parameters = new JArray();
+            jsonObject["jsonrpc"] = "2.0";
+            jsonObject["id"] = DateTime.Now.Ticks;
+            jsonObject["method"] = "aria2.addUri";
+            jsonObject["params"] = parameters;
+            parameters.Add(_Aria2Token);
+            parameters.Add(uris);
+            parameters.Add(opt);
+            uris.Add(downloadUri);
+            opt["gid"] = gid;
+            lock (_monitor)
+            {
+                _downloads.Add(gid, messageId);
+            }
+            return jsonObject;
         }
     }
 }
