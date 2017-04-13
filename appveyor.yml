@@ -18,5 +18,5 @@ before_build:
 build:
   project: src\phantomlord127.NewTelegramBot.NewTelegramBot.sln
   parallel: true
-verbosity: minimal
+  verbosity: minimal
 deploy: off
