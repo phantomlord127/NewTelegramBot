@@ -16,7 +16,7 @@ assembly_info:
 before_build:
 - cmd: pushd . && cd src && nuget restore && popd
 build:
-  project: src\phantomlord127.NewTelegramBot.NewTelegramBot.sln
+  project: src\phantomlord127\NewTelegramBot\NewTelegramBot.sln
   parallel: true
   verbosity: minimal
 deploy: off
