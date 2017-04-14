@@ -21,7 +21,7 @@
     <PackageCertificateKeyFile>NewTelegramBot_TemporaryKey.pfx</PackageCertificateKeyFile>
     <AppxPackage>true</AppxPackage>
     <ContainsStartupTask>true</ContainsStartupTask>
-    <PackageCertificateThumbprint>8764A0FE62D88EAC47E76EB05C89495A1EC663DB</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>527851B82A5258168E61F13C82DCF4B18F54FD7E</PackageCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM'">
     <DebugSymbols>true</DebugSymbols>
