@@ -2,5 +2,6 @@
 {
     None,
     MainMenu,
-    DownloadMode
+    DownloadMode,
+    ConfigRouter
 };
