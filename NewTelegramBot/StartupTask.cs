@@ -16,6 +16,9 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.System.Threading;
 
+using MetroLog;
+using MetroLog.Targets;
+
 namespace NewTelegramBot
 {
     public sealed class StartupTask : IBackgroundTask
@@ -30,6 +33,7 @@ namespace NewTelegramBot
         private ResourceLoader _conf;
         private Helpers.RPCAria2Helper _aria2;
         private TelegramBotState _state;
+        private ILoggerAsync _log;
         public ResourceLoader Config
         {
             get { return _conf; }
@@ -48,12 +52,8 @@ namespace NewTelegramBot
                     offset = updates.Max(u => u.Id) + 1;
                     foreach (Update update in updates)
                     {
-                        Message message = null;
-                        if (update.Type == UpdateType.MessageUpdate)
-                        {
-                            message = update.Message;
-                        }
-                        else if (update.Type == UpdateType.CallbackQueryUpdate)
+                        Message message = update.Message;
+                        if (message == null)
                         {
                             message = update.CallbackQuery.Message;
                         }
@@ -121,12 +121,20 @@ namespace NewTelegramBot
 
         public IAsyncAction SendMessageAsync(string message, int replyToMessageId)
         {
+            _log.TraceAsync($"Senden der Nachricht '{message}' mit Bezug zur Nachricht {replyToMessageId}");
             return _telebot.SendTextMessageAsync(_ChatID, message, replyToMessageId: replyToMessageId, replyMarkup: Helpers.KeyBoard.GetKeyboardByTelegramBotState(_state),
                 cancellationToken: _ct).AsAsyncAction();
         }
 
         private void Initialize(BackgroundTaskDeferral deferral)
         {
+            #if DEBUG
+                LogManagerFactory.DefaultConfiguration.AddTarget(LogLevel.Trace, LogLevel.Fatal, new StreamingFileTarget());
+            #else
+                LogManagerFactory.DefaultConfiguration.AddTarget(LogLevel.Error, LogLevel.Fatal, new StreamingFileTarget());
+            #endif
+            GlobalCrashHandler.Configure();
+            _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
             _deferral = deferral;
             _ctSrc = new CancellationTokenSource();
             _ct = _ctSrc.Token;
@@ -137,6 +145,7 @@ namespace NewTelegramBot
             _aria2 = new Helpers.RPCAria2Helper(_ct, this);
             _serverAwake = false;
             _state = TelegramBotState.None;
+            _log.TraceAsync("Initialize abgeschlossen.");
         }
 
         private async void CheckServerStateTimerElapsedHandler(ThreadPoolTimer timer)
@@ -148,18 +157,20 @@ namespace NewTelegramBot
                 string message = string.Empty;
                 if (serverAwake)
                 {
-                    message = "Der Server ist nun eingeschaltet!";
+                    message = $"Der Server ist nun eingeschaltet! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
                 }
                 else
                 {
-                    message = "Der Server ist nun ausgeschlatet!";
+                    message = $"Der Server ist nun ausgeschlatet! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
                 }
+                await _log.TraceAsync($"Toggle Server State via Timer {timer.Period.ToString()}");
                 await SendMessageAsync(message);
             }
         }
 
         private void TaskInstance_Canceled(IBackgroundTaskInstance sender, BackgroundTaskCancellationReason reason)
         {
+            _log.InfoAsync($"Task wurde beendet, weil: {reason.ToString()}");
             _CheckServerStateTimer.Cancel();
             _ctSrc.Cancel();
             _deferral.Complete();

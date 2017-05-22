@@ -1,19 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
-using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.ApplicationModel.Resources;
-using Windows.Foundation;
-using Windows.Networking;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NewTelegramBot.Helpers.Json;
+using MetroLog;
 
 namespace NewTelegramBot.Helpers
 {
@@ -22,13 +17,14 @@ namespace NewTelegramBot.Helpers
         private MessageWebSocket _webSock = new MessageWebSocket();
         private DataWriter _messageWriter;
         private Uri _serverUri;
-        private Dictionary<string, int> _downloads = new Dictionary<string, int>();
-        private Dictionary<int, string> _downloadQue = new Dictionary<int, string>();
-        private bool _isConnected = false;
-        private CancellationToken _ct;
-        private object _monitor = new object();
-        private string _Aria2Token;
-        private StartupTask _telegramBot;
+        readonly Dictionary<string, int> _downloads = new Dictionary<string, int>();
+        readonly Dictionary<int, string> _downloadQue = new Dictionary<int, string>();
+        private bool _isConnected;
+        readonly CancellationToken _ct;
+        readonly object _monitor = new object();
+        readonly string _Aria2Token;
+        readonly StartupTask _telegramBot;
+        readonly static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
 
         public RPCAria2Helper(CancellationToken ct, StartupTask telegramBot)
         {
@@ -36,13 +32,12 @@ namespace NewTelegramBot.Helpers
             _telegramBot = telegramBot;
             _serverUri = new Uri(telegramBot.Config.GetString("Aria2URL"));
             _Aria2Token = telegramBot.Config.GetString("Aria2Secret");
-
+            _log.TraceAsync("RPCAria2Helper initialisiert.");
         }
 
         public async Task DownloadURI(string downloadUri, int messageId)
         {
-            bool isConnected = await ConnectedToWebSocket();
-            if (isConnected)
+            if (await ConnectedToWebSocket())
             {
                 JArray request = new JArray();
                 if (_downloadQue.Count > 0)
@@ -62,7 +57,7 @@ namespace NewTelegramBot.Helpers
                 }
                 catch (Exception ex)
                 {
-                    string s = ex.Message;
+                    await _log.ErrorAsync("Fehler beim Speichern des Json-Objects", ex);
                 }
             }
             else
@@ -113,7 +108,7 @@ namespace NewTelegramBot.Helpers
                 }
                 catch (Exception ex)
                 {
-                    string s = ex.Message;
+                    await _log.ErrorAsync("Fehler beim Lesen des Json-Objects", ex);
                 }
             }
         }
@@ -134,6 +129,7 @@ namespace NewTelegramBot.Helpers
                 }
                 catch (Exception ex)
                 {
+                    await _log.ErrorAsync("Fehler beim Herstellen der Verbindung zum Server.", ex);
                     CloseWebSocketConnection();
                     _isConnected = false;
                 }
@@ -151,7 +147,7 @@ namespace NewTelegramBot.Helpers
                 }
                 catch (Exception ex)
                 {
-                    string s = ex.Message;
+                    _log.ErrorAsync("Fehler beim Schließen der Verbindung zum Server.", ex);
                 }
                 _webSock.Dispose();
             }

@@ -2,16 +2,18 @@
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Resources;
 using Windows.Foundation;
 using Windows.Networking.Sockets;
+using MetroLog;
 
 namespace NewTelegramBot
 {
-    public sealed class NetworkHelper
+    public static class NetworkHelper 
     {
+        private static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
+
         public static IAsyncOperation<bool> IsServerAwake()
         {
             return IsServerTheAwake().AsAsyncOperation<bool>();
@@ -32,11 +34,11 @@ namespace NewTelegramBot
             }
             catch (System.Runtime.InteropServices.COMException ex)
             {
-                string s = string.Empty;
+                await _log.InfoAsync("Der Server ist nicht eingeschaltet", ex);
             }
             catch (Exception ex)
             {
-                string s = string.Empty;
+                await _log.ErrorAsync("Die Überprüfung, ob der Server eingeschaltet ist, ist fehlgeschlagen.", ex);
             }
             finally
             {
@@ -53,41 +55,36 @@ namespace NewTelegramBot
         private static async Task WakeOnLan()
         {
             byte[] mac = ResourceLoader.GetForViewIndependentUse("Config").GetString("NetworkHelper_HostMacAddress").Split(':').Select(x => Convert.ToByte(x, 16)).ToArray();
-
             // WOL packet contains a 6-bytes trailer and 16 times a 6-bytes sequence containing the MAC address.
-
             byte[] packet = new byte[17 * 6];
-
             // Trailer of 6 times 0xFF.
             for (int i = 0; i < 6; i++)
+            {
                 packet[i] = 0xFF;
-
+            }
             // Body of magic packet contains 16 times the MAC address.
             for (int i = 1; i <= 16; i++)
+            {
                 for (int j = 0; j < 6; j++)
+                {
                     packet[i * 6 + j] = mac[j];
-            ArraySegment<byte> segmentPacket = new ArraySegment<byte>(packet);
+                }
+            }
             IPEndPoint ipEndPoint = new IPEndPoint(IPAddress.Broadcast, 40000);
-
-
             try
             {
                 // WOL packet is sent over UDP 255.255.255.0:40000.
-                //await client.Client.ConnectAsync(IPAddress.Parse("192.168.0.250"), 40000);
                 using (UdpClient client = new UdpClient())
                 {
                     client.EnableBroadcast = true;
                     // Send WOL packet.
                     await client.SendAsync(packet, packet.Length, ipEndPoint);
                 }
-            }
-            catch (SocketException ex)
-            {
-                string s = ex.Message;
+                await _log.DebugAsync("Magic-Paket verschickt.");
             }
             catch (Exception ex)
             {
-                string s = ex.Message;
+                await _log.ErrorAsync("Senden des Magic-Pakets ist fehlgeschlagen.", ex);
             }
         }
     }
