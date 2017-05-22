@@ -142,7 +142,7 @@ namespace NewTelegramBot
             _CheckServerStateTimer = ThreadPoolTimer.CreatePeriodicTimer(CheckServerStateTimerElapsedHandler, new TimeSpan(0, 5, 0));
             _telebot = new TelegramBotClient(_conf.GetString("TelegramToken"));
             _ChatID = Convert.ToInt64(_conf.GetString("TelegramChatID"));
-            _aria2 = new Helpers.RPCAria2Helper(_ct, this);
+            _aria2 = new Helpers.RPCAria2Helper(this);
             _serverAwake = false;
             _state = TelegramBotState.None;
             _log.TraceAsync("Initialize abgeschlossen.");
@@ -154,15 +154,8 @@ namespace NewTelegramBot
             if (serverAwake != _serverAwake)
             {
                 _serverAwake = serverAwake;
-                string message = string.Empty;
-                if (serverAwake)
-                {
-                    message = $"Der Server ist nun eingeschaltet! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
-                }
-                else
-                {
-                    message = $"Der Server ist nun ausgeschlatet! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
-                }
+                string serverState = serverAwake ? "eingeschaltet" : "ausgeschlatet";
+                string message = $"Der Server ist nun {serverState}! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
                 await _log.TraceAsync($"Toggle Server State via Timer {timer.Period.ToString()}");
                 await SendMessageAsync(message);
             }
@@ -173,6 +166,7 @@ namespace NewTelegramBot
             _log.InfoAsync($"Task wurde beendet, weil: {reason.ToString()}");
             _CheckServerStateTimer.Cancel();
             _ctSrc.Cancel();
+            _ctSrc.Dispose();
             _deferral.Complete();
         }
     }

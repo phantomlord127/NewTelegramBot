@@ -16,26 +16,24 @@ namespace NewTelegramBot.Helpers
     {
         private MessageWebSocket _webSock = new MessageWebSocket();
         private DataWriter _messageWriter;
-        private Uri _serverUri;
+        readonly Uri _serverUri;
         readonly Dictionary<string, int> _downloads = new Dictionary<string, int>();
         readonly Dictionary<int, string> _downloadQue = new Dictionary<int, string>();
         private bool _isConnected;
-        readonly CancellationToken _ct;
         readonly object _monitor = new object();
         readonly string _Aria2Token;
         readonly StartupTask _telegramBot;
         readonly static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
 
-        public RPCAria2Helper(CancellationToken ct, StartupTask telegramBot)
+        public RPCAria2Helper(StartupTask telegramBot)
         {
-            _ct = ct;
             _telegramBot = telegramBot;
             _serverUri = new Uri(telegramBot.Config.GetString("Aria2URL"));
             _Aria2Token = telegramBot.Config.GetString("Aria2Secret");
             _log.TraceAsync("RPCAria2Helper initialisiert.");
         }
 
-        public async Task DownloadURI(string downloadUri, int messageId)
+        public async Task DownloadURI(string downloadFile, int messageId)
         {
             if (await ConnectedToWebSocket())
             {
@@ -49,7 +47,7 @@ namespace NewTelegramBot.Helpers
                     _downloadQue.Clear();
                 }
 
-                request.Add(CreateRequestObject(downloadUri, messageId));
+                request.Add(CreateRequestObject(downloadFile, messageId));
                 _messageWriter.WriteString(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(request)));
                 try
                 {
@@ -64,7 +62,7 @@ namespace NewTelegramBot.Helpers
             {
                 lock (_monitor)
                 {
-                    _downloadQue.Add(messageId, downloadUri);
+                    _downloadQue.Add(messageId, downloadFile);
                 }
             }
         }
@@ -86,7 +84,6 @@ namespace NewTelegramBot.Helpers
                     if (response.Error == null)
                     {
                         string gid = response.Parameters[0].Gid.ToString();
-                        int messageID = _downloads[gid];
                         // Wenn download Start
                         await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Method.ToString()}");
 
@@ -160,7 +157,7 @@ namespace NewTelegramBot.Helpers
             CloseWebSocketConnection();
         }
 
-        private JObject CreateRequestObject(string downloadUri, int messageId)
+        private JObject CreateRequestObject(string downloadFile, int messageId)
         {
             string gid = Guid.NewGuid().ToString("n").Substring(0, 16);
             JObject jsonObject = new JObject();
@@ -174,7 +171,7 @@ namespace NewTelegramBot.Helpers
             parameters.Add(_Aria2Token);
             parameters.Add(uris);
             parameters.Add(opt);
-            uris.Add(downloadUri);
+            uris.Add(downloadFile);
             opt["gid"] = gid;
             lock (_monitor)
             {
