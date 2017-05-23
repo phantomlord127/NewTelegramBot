@@ -8,7 +8,7 @@ namespace NewTelegramBot.Helpers.Json
     class JsonRcpRequest
     {
         [JsonProperty("jsonrpc", Required = Required.Always)]
-        public static JToken JsonRPC { get { return "2.0"; } }
+        public static JToken JsonRpc { get { return "2.0"; } }
 
         [JsonProperty("id", Required = Required.Always, NullValueHandling = NullValueHandling.Include)]
         public JToken Id { get; set; }

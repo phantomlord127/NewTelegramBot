@@ -8,7 +8,7 @@ namespace NewTelegramBot.Helpers.Json
     class JsonRessponse
     {
         [JsonProperty("jsonrpc", DefaultValueHandling = DefaultValueHandling.Ignore)]
-        public string JsonRPC { get;  set; }
+        public string JsonRpc { get;  set; }
 
         [JsonProperty("id", NullValueHandling = NullValueHandling.Include)]
         public string Id { get; set; }

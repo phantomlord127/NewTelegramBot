@@ -31,7 +31,7 @@ namespace NewTelegramBot
         private bool _serverAwake;
         private long _ChatID;
         private ResourceLoader _conf;
-        private Helpers.RPCAria2Helper _aria2;
+        private Helpers.RpcAria2Helper _aria2;
         private TelegramBotState _state;
         private ILoggerAsync _log;
         public ResourceLoader Config
@@ -91,7 +91,7 @@ namespace NewTelegramBot
                                 {
                                     if (_state == TelegramBotState.DownloadMode)
                                     {
-                                        await _aria2.DownloadURI(message.Text, message.MessageId);
+                                        await _aria2.DownloadUri(message.Text, message.MessageId);
                                         msg = "Download eingereiht";
                                     }
                                     else
@@ -145,7 +145,7 @@ namespace NewTelegramBot
             _CheckServerStateTimer = ThreadPoolTimer.CreatePeriodicTimer(CheckServerStateTimerElapsedHandler, new TimeSpan(0, 5, 0));
             _telebot = new TelegramBotClient(_conf.GetString("TelegramToken"));
             _ChatID = Convert.ToInt64(_conf.GetString("TelegramChatID"));
-            _aria2 = new Helpers.RPCAria2Helper(this);
+            _aria2 = new Helpers.RpcAria2Helper(this);
             _serverAwake = false;
             _state = TelegramBotState.None;
             _log.TraceAsync("Initialize abgeschlossen.");

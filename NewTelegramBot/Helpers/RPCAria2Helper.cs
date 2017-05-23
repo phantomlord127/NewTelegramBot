@@ -12,7 +12,7 @@ using MetroLog;
 
 namespace NewTelegramBot.Helpers
 {
-    class RPCAria2Helper : IDisposable
+    class RpcAria2Helper : IDisposable
     {
         private MessageWebSocket _webSock = new MessageWebSocket();
         private DataWriter _messageWriter;
@@ -25,7 +25,7 @@ namespace NewTelegramBot.Helpers
         readonly StartupTask _telegramBot;
         readonly static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
 
-        public RPCAria2Helper(StartupTask telegramBot)
+        public RpcAria2Helper(StartupTask telegramBot)
         {
             _telegramBot = telegramBot;
             _serverUri = new Uri(telegramBot.Config.GetString("Aria2URL"));
@@ -33,7 +33,7 @@ namespace NewTelegramBot.Helpers
             _log.TraceAsync("RPCAria2Helper initialisiert.");
         }
 
-        public async Task DownloadURI(string downloadFile, int messageId)
+        public async Task DownloadUri(string downloadFile, int messageId)
         {
             if (await ConnectedToWebSocket())
             {
@@ -154,7 +154,15 @@ namespace NewTelegramBot.Helpers
 
         public void Dispose()
         {
+            Dispose(true);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            _log.InfoAsync("Disposing RpcAria2Helper");
             CloseWebSocketConnection();
+            _downloadQue.Clear();
+            _downloads.Clear();
         }
 
         private JObject CreateRequestObject(string downloadFile, int messageId)
