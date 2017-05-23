@@ -128,12 +128,15 @@ namespace NewTelegramBot
 
         private void Initialize(BackgroundTaskDeferral deferral)
         {
-            #if DEBUG
-                LogManagerFactory.DefaultConfiguration.AddTarget(LogLevel.Trace, LogLevel.Fatal, new StreamingFileTarget());
-            #else
-                LogManagerFactory.DefaultConfiguration.AddTarget(LogLevel.Error, LogLevel.Fatal, new StreamingFileTarget());
-            #endif
-            GlobalCrashHandler.Configure();
+            LoggingConfiguration logConf = new LoggingConfiguration();
+#if DEBUG
+            logConf.AddTarget(LogLevel.Trace, LogLevel.Fatal, new StreamingFileTarget());
+            logConf.AddTarget(LogLevel.Trace, LogLevel.Fatal, new DebugTarget());
+#else
+            logConf.AddTarget(LogLevel.Error, LogLevel.Fatal, new StreamingFileTarget());
+#endif
+            logConf.IsEnabled = true;
+            LogManagerFactory.DefaultConfiguration = logConf;
             _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
             _deferral = deferral;
             _ctSrc = new CancellationTokenSource();
