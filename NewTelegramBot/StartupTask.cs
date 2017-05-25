@@ -44,6 +44,7 @@ namespace NewTelegramBot
             taskInstance.Canceled += TaskInstance_Canceled;
             Initialize(taskInstance.GetDeferral());
             int offset = 0;
+            List<Task> taskList = new List<Task>();
             while (! _ct.IsCancellationRequested)
             {
                 Update[] updates = await _telebot.GetUpdatesAsync(offset);
@@ -60,7 +61,7 @@ namespace NewTelegramBot
 
                         if (message.Chat.Id == _ChatID)
                         {
-                            await _telebot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, _ct).ConfigureAwait(false);
+                            taskList.Add(_telebot.SendChatActionAsync(message.Chat.Id, ChatAction.Typing, _ct));
                             if (update.Type == UpdateType.MessageUpdate)
                             {
                                 string msg = string.Empty;
@@ -72,7 +73,7 @@ namespace NewTelegramBot
                                         msg = "Der Server ist bereits an.";
                                         if (!_serverAwake)
                                         {
-                                            await NetworkHelper.WakeTheServer();
+                                            taskList.Add(NetworkHelper.WakeTheServer().AsTask());
                                             msg = "Der Server wird gestartet";
                                         }
                                     }
@@ -91,7 +92,7 @@ namespace NewTelegramBot
                                 {
                                     if (_state == TelegramBotState.DownloadMode)
                                     {
-                                        await _aria2.DownloadUri(message.Text, message.MessageId);
+                                        taskList.Add(_aria2.DownloadUri(message.Text, message.MessageId));
                                         msg = "Download eingereiht";
                                     }
                                     else
@@ -99,31 +100,43 @@ namespace NewTelegramBot
                                         msg = "Kommando nicht verstanden.";
                                     }
                                 }
-                                await SendMessageAsync(msg);
+                                taskList.Add(SendMessageAsync(msg).AsTask<int>());
                             }
                             else if (update.Type == UpdateType.CallbackQueryUpdate)
                             {
-                                await SendMessageAsync("Callback Stuff", message.MessageId);
+                                taskList.Add(SendMessageAsync("Callback Stuff", message.MessageId).AsTask<int>());
                             }
                         }
                     }
+                    Task.WaitAll(taskList.ToArray(), _ct);
                 }
                 await Task.Delay(new TimeSpan(0, 0, 10), _ct);
             }
-
             _deferral.Complete();
         }
 
-        public IAsyncAction SendMessageAsync(string message)
+        public IAsyncOperation<int> SendMessageAsync(string message)
         {
             return SendMessageAsync(message, 0);
         }
 
-        public IAsyncAction SendMessageAsync(string message, int replyToMessageId)
+        public IAsyncOperation<int> SendMessageAsync(string message, int replyToMessageId)
         {
-            _log.TraceAsync($"Senden der Nachricht '{message}' mit Bezug zur Nachricht {replyToMessageId}");
-            return _telebot.SendTextMessageAsync(_ChatID, message, replyToMessageId: replyToMessageId, replyMarkup: Helpers.KeyBoard.GetKeyboardByTelegramBotState(_state),
-                cancellationToken: _ct).AsAsyncAction();
+            return SendMessage(message, replyToMessageId).AsAsyncOperation<int>();
+        }
+
+        private async Task<int> SendMessage(string message, int replyToMessageId)
+        {
+            await _log.TraceAsync($"Senden der Nachricht '{message}' mit Bezug zur Nachricht {replyToMessageId}").ConfigureAwait(false);
+            Message msg = await _telebot.SendTextMessageAsync(_ChatID, message, replyToMessageId: replyToMessageId, replyMarkup: Helpers.KeyBoard.GetKeyboardByTelegramBotState(_state),
+                cancellationToken: _ct);
+            return msg.MessageId;
+        }
+
+        public IAsyncAction EditMessageAsync(string message, int editMessageId)
+        {
+            _log.TraceAsync($"Editieren der Nachricht '{message}' mit der ID {editMessageId}");
+            return _telebot.EditMessageTextAsync(_ChatID, editMessageId, message, cancellationToken: _ct).AsAsyncAction();
         }
 
         private void Initialize(BackgroundTaskDeferral deferral)
@@ -131,7 +144,7 @@ namespace NewTelegramBot
             LoggingConfiguration logConf = new LoggingConfiguration();
 #if DEBUG
             logConf.AddTarget(LogLevel.Trace, LogLevel.Fatal, new StreamingFileTarget());
-            logConf.AddTarget(LogLevel.Trace, LogLevel.Fatal, new DebugTarget());
+            logConf.AddTarget(LogLevel.Warn, LogLevel.Fatal, new DebugTarget());
 #else
             logConf.AddTarget(LogLevel.Error, LogLevel.Fatal, new StreamingFileTarget());
 #endif

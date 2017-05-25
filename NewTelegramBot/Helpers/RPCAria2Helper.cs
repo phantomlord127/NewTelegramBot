@@ -42,21 +42,11 @@ namespace NewTelegramBot.Helpers
                 {
                     foreach (KeyValuePair<int, string> entry in _downloadQue)
                     {
-                        request.Add(CreateRequestObject(entry.Value, entry.Key));
+                        SendMessage(entry.Value, entry.Key);
                     }
                     _downloadQue.Clear();
                 }
-
-                request.Add(CreateRequestObject(downloadFile, messageId));
-                _messageWriter.WriteString(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(request)));
-                try
-                {
-                    await _messageWriter.StoreAsync();
-                }
-                catch (Exception ex)
-                {
-                    await _log.ErrorAsync("Fehler beim Speichern des Json-Objects", ex);
-                }
+                SendMessage(downloadFile, messageId);
             }
             else
             {
@@ -64,6 +54,19 @@ namespace NewTelegramBot.Helpers
                 {
                     _downloadQue.Add(messageId, downloadFile);
                 }
+            }
+        }
+
+        private async void SendMessage(string downloadFile, int messageId)
+        {
+            _messageWriter.WriteString(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(CreateRequestObject(downloadFile, messageId))));
+            try
+            {
+                await _messageWriter.StoreAsync();
+            }
+            catch (Exception ex)
+            {
+                await _log.ErrorAsync("Fehler beim Speichern des Json-Objects", ex);
             }
         }
 
@@ -79,28 +82,43 @@ namespace NewTelegramBot.Helpers
                 reader.UnicodeEncoding = UnicodeEncoding.Utf8;
                 try
                 {
+                    string msg = string.Empty;
+                    int messageID = 0;
                     string read = reader.ReadString(reader.UnconsumedBufferLength);
                     JsonRessponse response = await Task.Factory.StartNew(() => JsonConvert.DeserializeObject<JsonRessponse>(read));
                     if (response.Error == null)
                     {
                         string gid = response.Parameters[0].Gid.ToString();
-                        // Wenn download Start
-                        await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Method.ToString()}");
-
-                        // Wenn Dowload Ende
-                        if (response.Method.ToString() == "aria2.onDownloadComplete()")
+                        _downloads.TryGetValue(gid, out messageID);
+                        if (response.Method.ToString() == "aria2.onDownloadStart")
                         {
-                            lock (_monitor)
-                            {
-                                _downloads.Remove(gid);
-                            }
+                            _downloads[gid] = await _telegramBot.SendMessageAsync("Download gestartet");
                         }
-
-
+                        else
+                        {
+                            if (response.Method.ToString() == "aria2.onDownloadComplete")
+                            {
+                                msg = "Doanload beendet";
+                                lock (_monitor)
+                                {
+                                    _downloads.Remove(gid);
+                                }
+                            }
+                            else
+                            {
+                                msg = $"Nachricht zum Download: {response.Method.ToString()}";
+                            }
+                            await _telegramBot.EditMessageAsync(msg, messageID);
+                        }
                         if (_downloads.Count == 0)
                         {
                             CloseWebSocketConnection();
                         }
+                    }
+                    else
+                    {
+                        await _log.ErrorAsync($"Fehler bei Aria2:{response.ToString()}");
+                        await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Error.ToString()}");
                     }
                 }
                 catch (Exception ex)
@@ -141,6 +159,7 @@ namespace NewTelegramBot.Helpers
                 try
                 {
                     _webSock.Close(1000, "All Downloads fineshed.");
+                    _log.InfoAsync("Verbindung zu Aria2 geschlossen.");
                 }
                 catch (Exception ex)
                 {
