@@ -11,7 +11,7 @@ namespace NewTelegramBot.Helpers.Json
         public string JsonRpc { get;  set; }
 
         [JsonProperty("id", NullValueHandling = NullValueHandling.Include)]
-        public string Id { get; set; }
+        public long Id { get; set; }
 
         [JsonProperty("method", NullValueHandling = NullValueHandling.Ignore)]
         public string Method { get; set; }

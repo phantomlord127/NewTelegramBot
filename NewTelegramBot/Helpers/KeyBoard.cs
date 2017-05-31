@@ -26,8 +26,8 @@ namespace NewTelegramBot.Helpers
 
         public static ReplyKeyboardMarkup MainKeyboard()
         {
-            KeyboardButton b1 = new KeyboardButton("\U0001f5a5 Server starten");
-            KeyboardButton b2 = new KeyboardButton("\U0001f517 Download Modus");
+            KeyboardButton b1 = new KeyboardButton("\ud83d\udd5a Server starten");
+            KeyboardButton b2 = new KeyboardButton("\ud83d\udd17 Download Modus");
             KeyboardButton b3 = new KeyboardButton("\U00002328 Router-Konfig");
             KeyboardButton[] firstRow = new [] { b1 };
             KeyboardButton[] secondRow = new [] { b2 };

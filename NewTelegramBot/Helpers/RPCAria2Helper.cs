@@ -37,16 +37,15 @@ namespace NewTelegramBot.Helpers
         {
             if (await ConnectedToWebSocket())
             {
-                JArray request = new JArray();
                 if (_downloadQue.Count > 0)
                 {
                     foreach (KeyValuePair<int, string> entry in _downloadQue)
                     {
-                        SendMessage(entry.Value, entry.Key);
+                        await SendMessage(entry.Value, entry.Key).ConfigureAwait(false);
                     }
                     _downloadQue.Clear();
                 }
-                SendMessage(downloadFile, messageId);
+                await SendMessage(downloadFile, messageId).ConfigureAwait(false);
             }
             else
             {
@@ -57,12 +56,16 @@ namespace NewTelegramBot.Helpers
             }
         }
 
-        private async void SendMessage(string downloadFile, int messageId)
+        private async Task SendMessage(string downloadFile, int messageId)
         {
-            _messageWriter.WriteString(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(CreateRequestObject(downloadFile, messageId))));
+            string msg = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(CreateRequestObject(downloadFile, messageId)));
+            await _log.DebugAsync($"Aria2: Write Message: {msg}");
+            _messageWriter.WriteString(msg);
             try
             {
                 await _messageWriter.StoreAsync();
+                await _messageWriter.FlushAsync();
+                await _log.DebugAsync($"Aria2: Message send: {msg}");
             }
             catch (Exception ex)
             {
@@ -72,7 +75,7 @@ namespace NewTelegramBot.Helpers
 
         private void WebSock_Closed(IWebSocket sender, WebSocketClosedEventArgs args)
         {
-            CloseWebSocketConnection();
+            CloseWebSocketConnection(args.Code, args.Reason);
         }
 
         private async void WebSock_MessageReceived(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
@@ -85,20 +88,21 @@ namespace NewTelegramBot.Helpers
                     string msg = string.Empty;
                     int messageID = 0;
                     string read = reader.ReadString(reader.UnconsumedBufferLength);
+                    await _log.DebugAsync($"Aria2: Message received: {read}");
                     JsonRessponse response = await Task.Factory.StartNew(() => JsonConvert.DeserializeObject<JsonRessponse>(read));
-                    if (response.Error == null)
+                    if (response.Error == null && response.Parameters != null)
                     {
                         string gid = response.Parameters[0].Gid.ToString();
                         _downloads.TryGetValue(gid, out messageID);
                         if (response.Method.ToString() == "aria2.onDownloadStart")
                         {
-                            _downloads[gid] = await _telegramBot.SendMessageAsync("Download gestartet");
+                            await _telegramBot.SendMessageAsync("Download gestartet");
                         }
                         else
                         {
                             if (response.Method.ToString() == "aria2.onDownloadComplete")
                             {
-                                msg = "Doanload beendet";
+                                msg = "Download beendet";
                                 lock (_monitor)
                                 {
                                     _downloads.Remove(gid);
@@ -108,17 +112,21 @@ namespace NewTelegramBot.Helpers
                             {
                                 msg = $"Nachricht zum Download: {response.Method.ToString()}";
                             }
-                            await _telegramBot.EditMessageAsync(msg, messageID);
+                            await _telegramBot.SendMessageAsync(msg, messageID);
                         }
                         if (_downloads.Count == 0)
                         {
                             CloseWebSocketConnection();
                         }
                     }
-                    else
+                    else if (response.Error != null)
                     {
                         await _log.ErrorAsync($"Fehler bei Aria2:{response.ToString()}");
                         await _telegramBot.SendMessageAsync($"Nachricht zu diesem Download:{Environment.NewLine}{response.Error.ToString()}");
+                    }
+                    else
+                    {
+                        await _log.InfoAsync($"Aria2 Nachricht ohne Auswirkung:{response.ToString()}");
                     }
                 }
                 catch (Exception ex)
@@ -152,20 +160,22 @@ namespace NewTelegramBot.Helpers
             return _isConnected;
         }
 
-        private void CloseWebSocketConnection()
+        private void CloseWebSocketConnection(ushort code = 1000, string reason = "Closed due to user request.")
         {
             if (_webSock != null)
             {
                 try
                 {
-                    _webSock.Close(1000, "All Downloads fineshed.");
+                    _messageWriter.DetachStream();
+                    _messageWriter.Dispose();
+                    _messageWriter = null;
+                    _webSock.Close(code, reason);
                     _log.InfoAsync("Verbindung zu Aria2 geschlossen.");
                 }
                 catch (Exception ex)
                 {
                     _log.ErrorAsync("Fehler beim Schließen der Verbindung zum Server.", ex);
                 }
-                _webSock.Dispose();
             }
             _webSock = null;
             _isConnected = false;

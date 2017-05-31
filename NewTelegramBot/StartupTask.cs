@@ -45,6 +45,7 @@ namespace NewTelegramBot
             Initialize(taskInstance.GetDeferral());
             int offset = 0;
             List<Task> taskList = new List<Task>();
+            await SendMessageAsync("Bot gestartet.");
             while (! _ct.IsCancellationRequested)
             {
                 Update[] updates = await _telebot.GetUpdatesAsync(offset);
@@ -67,17 +68,18 @@ namespace NewTelegramBot
                                 string msg = string.Empty;
                                 if (! string.IsNullOrEmpty(message.Text))
                                 {
-                                    if (message.Text.Equals("\U0001f5a5 Server starten"))
+                                    if (message.Text.Equals("\ud83d\udd5a Server starten"))
                                     {
                                         _serverAwake = await NetworkHelper.IsServerAwake();
                                         msg = "Der Server ist bereits an.";
                                         if (!_serverAwake)
                                         {
                                             taskList.Add(NetworkHelper.WakeTheServer().AsTask());
+                                            ThreadPoolTimer.CreateTimer(CheckServerStateTimerElapsedHandler, new TimeSpan(0, 2, 0));
                                             msg = "Der Server wird gestartet";
                                         }
                                     }
-                                    else if (message.Text.Equals("\U0001f517 Download Modus"))
+                                    else if (message.Text.Equals("\ud83d\udd17 Download Modus"))
                                     {
                                         msg = "Download Modus aktiv";
                                         _state = TelegramBotState.DownloadMode;
@@ -144,7 +146,7 @@ namespace NewTelegramBot
             LoggingConfiguration logConf = new LoggingConfiguration();
 #if DEBUG
             logConf.AddTarget(LogLevel.Trace, LogLevel.Fatal, new StreamingFileTarget());
-            logConf.AddTarget(LogLevel.Warn, LogLevel.Fatal, new DebugTarget());
+            logConf.AddTarget(LogLevel.Debug, LogLevel.Fatal, new DebugTarget());
 #else
             logConf.AddTarget(LogLevel.Error, LogLevel.Fatal, new StreamingFileTarget());
 #endif
@@ -166,20 +168,25 @@ namespace NewTelegramBot
 
         private async void CheckServerStateTimerElapsedHandler(ThreadPoolTimer timer)
         {
+            await _log.InfoAsync("Timer abgelaufen.");
             bool serverAwake = await NetworkHelper.IsServerAwake();
             if (serverAwake != _serverAwake)
             {
                 _serverAwake = serverAwake;
-                string serverState = serverAwake ? "eingeschaltet" : "ausgeschlatet";
-                string message = $"Der Server ist nun {serverState}! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
-                await _log.TraceAsync($"Toggle Server State via Timer {timer.Period.ToString()}");
-                await SendMessageAsync(message);
+                await _log.TraceAsync("Toggle Server State via Timer");
+                if (timer.Delay == null)
+                {
+                    string serverState = serverAwake ? "eingeschaltet" : "ausgeschlatet";
+                    string message = $"Der Server ist nun {serverState}! {Environment.NewLine} Erkannt durch Timer um {timer.Period.ToString()}";
+                    await SendMessageAsync(message);
+                }
             }
         }
 
-        private void TaskInstance_Canceled(IBackgroundTaskInstance sender, BackgroundTaskCancellationReason reason)
+        private async void TaskInstance_Canceled(IBackgroundTaskInstance sender, BackgroundTaskCancellationReason reason)
         {
-            _log.InfoAsync($"Task wurde beendet, weil: {reason.ToString()}");
+            await SendMessageAsync("Bot geht aus.");
+            await _log.InfoAsync($"Task wurde beendet, weil: {reason.ToString()}");
             _CheckServerStateTimer.Cancel();
             _ctSrc.Cancel();
             _ctSrc.Dispose();
