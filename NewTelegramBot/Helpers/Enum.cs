@@ -3,5 +3,6 @@
     None,
     MainMenu,
     DownloadMode,
+    DownloadQued,
     ConfigRouter
 };

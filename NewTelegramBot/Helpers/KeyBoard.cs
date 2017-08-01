@@ -11,12 +11,14 @@ namespace NewTelegramBot.Helpers
 {
     static class KeyBoard
     {
-        public static ReplyKeyboardMarkup GetKeyboardByTelegramBotState(TelegramBotState state)
+        public static IReplyMarkup GetKeyboardByTelegramBotState(TelegramBotState state)
         {
             switch (state)
             {
                 case TelegramBotState.DownloadMode:
                     return DownloadKeyboard();
+                case TelegramBotState.DownloadQued:
+                    return DownloadMessageKeyboard();
                 case TelegramBotState.ConfigRouter:
                     return ConfigRouter();
                 default:
@@ -34,6 +36,15 @@ namespace NewTelegramBot.Helpers
             KeyboardButton[] thirdRow = new [] { b3 };
             KeyboardButton[][] rows = new [] { firstRow, secondRow, thirdRow };
             return new ReplyKeyboardMarkup(rows, true);
+        }
+
+        public static InlineKeyboardMarkup DownloadMessageKeyboard()
+        {
+            InlineKeyboardButton b1 = new KeyboardButton("\U000023ef"); //PlayPause
+            InlineKeyboardButton b2 = new KeyboardButton("\U000023ed"); //Next
+            InlineKeyboardButton b3 = new KeyboardButton("\U000023f9"); //Stop
+            InlineKeyboardButton[] row = new [] { b1, b2, b3 };
+            return new InlineKeyboardMarkup(row);
         }
 
         public static ReplyKeyboardMarkup DownloadKeyboard()

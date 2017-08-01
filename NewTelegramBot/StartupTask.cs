@@ -92,10 +92,11 @@ namespace NewTelegramBot
                                 }
                                 if (string.IsNullOrEmpty(msg))
                                 {
-                                    if (_state == TelegramBotState.DownloadMode)
+                                    if (_state >= TelegramBotState.DownloadMode && _state <= TelegramBotState.DownloadQued)
                                     {
                                         taskList.Add(_aria2.DownloadUri(message.Text, message.MessageId));
                                         msg = "Download eingereiht";
+                                        _state = TelegramBotState.DownloadQued;
                                     }
                                     else
                                     {
@@ -107,6 +108,7 @@ namespace NewTelegramBot
                             else if (update.Type == UpdateType.CallbackQueryUpdate)
                             {
                                 taskList.Add(SendMessageAsync("Callback Stuff", message.MessageId).AsTask<int>());
+                                //ToDo: Mit dem Download interagieren
                             }
                         }
                     }
