@@ -22,10 +22,10 @@ namespace NewTelegramBot.Helpers
         private bool _isConnected;
         readonly object _monitor = new object();
         readonly string _Aria2Token;
-        readonly StartupTask _telegramBot;
+        readonly TelegramBot _telegramBot;
         readonly static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
 
-        public RpcAria2Helper(StartupTask telegramBot)
+        public RpcAria2Helper(TelegramBot telegramBot)
         {
             _telegramBot = telegramBot;
             _serverUri = new Uri(telegramBot.Config.GetString("Aria2URL"));
