@@ -97,6 +97,7 @@ namespace NewTelegramBot.Helpers
                         if (response.Method.ToString() == "aria2.onDownloadStart")
                         {
                             await _telegramBot.SendMessageAsync("Download gestartet");
+                            //ToDo ThreadpoolTimer
                         }
                         else
                         {
@@ -214,6 +215,21 @@ namespace NewTelegramBot.Helpers
             {
                 _downloads.Add(gid, messageId);
             }
+            return jsonObject;
+        }
+
+        private JObject TellStatus(string gid)
+        {
+            JObject jsonObject = new JObject();
+            JArray gids = new JArray();
+            JArray parameters = new JArray();
+            jsonObject["jsonrpc"] = "2.0";
+            jsonObject["id"] = DateTime.Now.Ticks;
+            jsonObject["method"] = "aria2.tellStatus";
+            jsonObject["params"] = parameters;
+            parameters.Add(_Aria2Token);
+            parameters.Add(gids);
+            gids.Add(gid);
             return jsonObject;
         }
     }
