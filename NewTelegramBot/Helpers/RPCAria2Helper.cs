@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
+using Windows.System.Threading;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,6 +25,7 @@ namespace NewTelegramBot.Helpers
         readonly string _Aria2Token;
         readonly TelegramBot _telegramBot;
         readonly static ILoggerAsync _log = (ILoggerAsync)LogManagerFactory.DefaultLogManager.GetLogger<StartupTask>();
+        private ThreadPoolTimer _UpdateDownloadStateTimer;
 
         public RpcAria2Helper(TelegramBot telegramBot)
         {
@@ -58,7 +60,11 @@ namespace NewTelegramBot.Helpers
 
         private async Task SendMessage(string downloadFile, int messageId)
         {
-            string msg = await Task.Factory.StartNew(() => JsonConvert.SerializeObject(CreateRequestObject(downloadFile, messageId)));
+            await SendMessage(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(CreateRequestObject(downloadFile, messageId))));
+        }
+
+        private async Task SendMessage(string msg)
+        {
             await _log.DebugAsync($"Aria2: Write Message: {msg}");
             _messageWriter.WriteString(msg);
             try
@@ -97,7 +103,10 @@ namespace NewTelegramBot.Helpers
                         if (response.Method.ToString() == "aria2.onDownloadStart")
                         {
                             await _telegramBot.SendMessageAsync("Download gestartet");
-                            //ToDo ThreadpoolTimer
+                            if (_UpdateDownloadStateTimer == null)
+                            {
+                                _UpdateDownloadStateTimer = ThreadPoolTimer.CreatePeriodicTimer(UpdateDownloadStateTimerElapsedHandler, new TimeSpan(0, 0, 5));
+                            }
                         }
                         else
                         {
@@ -221,16 +230,36 @@ namespace NewTelegramBot.Helpers
         private JObject TellStatus(string gid)
         {
             JObject jsonObject = new JObject();
-            JArray gids = new JArray();
+            JArray options = new JArray();
             JArray parameters = new JArray();
             jsonObject["jsonrpc"] = "2.0";
             jsonObject["id"] = DateTime.Now.Ticks;
             jsonObject["method"] = "aria2.tellStatus";
             jsonObject["params"] = parameters;
             parameters.Add(_Aria2Token);
-            parameters.Add(gids);
-            gids.Add(gid);
+            parameters.Add(gid);
+            parameters.Add(options);
+            options.Add("gid");
+            options.Add("status");
+            options.Add("completedLength");
+            options.Add("totalLength");
             return jsonObject;
+        }
+
+        private async void UpdateDownloadStateTimerElapsedHandler(ThreadPoolTimer timer)
+        {
+            if (_downloads.Count > 0)
+            {
+                foreach (string key in _downloads.Keys)
+                {
+                    await SendMessage(await Task.Factory.StartNew(() => JsonConvert.SerializeObject(TellStatus(key))));
+                }
+            }
+            else
+            {
+                _UpdateDownloadStateTimer.Cancel();
+                _UpdateDownloadStateTimer = null;
+            }
         }
     }
 }
